@@ -8,7 +8,7 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 // Routes
 const authRoutes = require("./Routes/authRoutes");
 const menuRoutes = require("./Routes/menuRoutes");
-const orderRoutes = require("./Routes/orderRoutes");
+const orderRoutes =require("./Routes/orderRoutes");
 const billRoutes = require("./Routes/billRoutes");
 
 const app = express();
@@ -39,7 +39,14 @@ app.get("/", (req, res) => {
   res.status(200).send("🚀 Server is running fine!");
 });
 
-console.log("Mongo URI Loaded:", process.env.MONGO_URI?.startsWith("mongodb"));
+// Environment variable logging
+console.log("=== Server Configuration ===");
+console.log("Port:", PORT);
+console.log("Mongo URI Loaded:", !!process.env.MONGO_URI);
+console.log("JWT_SECRET Loaded:", !!process.env.JWT_SECRET);
+console.log("EMAIL_USER Loaded:", !!process.env.EMAIL_USER);
+console.log("EMAIL_PASS Loaded:", !!process.env.EMAIL_PASS);
+console.log("==========================");
 
 const startServer = async () => {
   console.log("Connecting to MongoDB Atlas...");
@@ -48,14 +55,14 @@ const startServer = async () => {
       family: 4,
     });
 
-    console.log("MongoDB Atlas Connected");
+    console.log("✅ MongoDB Atlas Connected");
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running at http://localhost:${PORT}`);
     });
 
   } catch (error) {
-    console.error("MongoDB Atlas Connection Failed:", error.message);
+    console.error("❌ MongoDB Atlas Connection Failed:", error.message);
     process.exit(1);
   }
 };

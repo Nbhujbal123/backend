@@ -5,14 +5,34 @@ const path = require("path");
 
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
-// Routes
-const authRoutes = require("./Routes/authRoutes");
-const menuRoutes = require("./Routes/menuRoutes");
-const orderRoutes =require("./Routes/orderRoutes");
-const billRoutes = require("./Routes/billRoutes");
-
-const app = express();
 const PORT = process.env.PORT || 5000;
+
+// 🔹 Validate all required environment variables at startup
+const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET', 'EMAIL_USER', 'EMAIL_PASS'];
+const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+
+if (missingEnvVars.length > 0) {
+  console.error("❌ Missing required environment variables:", missingEnvVars.join(", "));
+  console.error("Please configure all required variables in .env file");
+  // Don't exit in development - just warn
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+} else {
+  console.log("✅ All required environment variables are configured");
+}
+
+// 🔹 Log environment configuration (without sensitive data)
+console.log("=== Server Configuration ===");
+console.log("Port:", PORT);
+console.log("Node Environment:", process.env.NODE_ENV || "development");
+console.log("Mongo URI Loaded:", !!process.env.MONGO_URI);
+console.log("JWT_SECRET Loaded:", !!process.env.JWT_SECRET);
+console.log("EMAIL_USER Loaded:", !!process.env.EMAIL_USER);
+console.log("EMAIL_PASS Loaded:", !!process.env.EMAIL_PASS);
+console.log("===========================");
+
+// Routes
 
 /* ===================== CORS FIX ===================== */
 
@@ -38,15 +58,6 @@ app.use("/api/bills", billRoutes);
 app.get("/", (req, res) => {
   res.status(200).send("🚀 Server is running fine!");
 });
-
-// Environment variable logging
-console.log("=== Server Configuration ===");
-console.log("Port:", PORT);
-console.log("Mongo URI Loaded:", !!process.env.MONGO_URI);
-console.log("JWT_SECRET Loaded:", !!process.env.JWT_SECRET);
-console.log("EMAIL_USER Loaded:", !!process.env.EMAIL_USER);
-console.log("EMAIL_PASS Loaded:", !!process.env.EMAIL_PASS);
-console.log("==========================");
 
 const startServer = async () => {
   console.log("Connecting to MongoDB Atlas...");

@@ -69,26 +69,36 @@ exports.signup = async (req, res) => {
     const normalizedEmail = (email || "").trim().toLowerCase();
     const normalizedMobile = (phone || mobile || "").toString().trim();
 
+    console.log("📝 Signup attempt for:", normalizedEmail);
+
     // Validation - 400 for validation errors
     if (!name || !normalizedEmail || !normalizedMobile || !password) {
+      console.log("❌ Signup failed: Missing required fields");
       return res.status(400).json({ message: "All fields are required" });
     }
     if (password.length < 6) {
+      console.log("❌ Signup failed: Password too short");
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
     const emailRegex = /\S+@\S+\.\S+/;
     if (!emailRegex.test(normalizedEmail)) {
+      console.log("❌ Signup failed: Invalid email format");
       return res.status(400).json({ message: "Invalid email format" });
     }
 
     // Check if email already exists - 409 for conflict
     let user = await User.findOne({ email: normalizedEmail });
     if (user && user.isVerified) {
+      console.log("❌ Signup failed: Email already registered -", normalizedEmail);
       return res.status(409).json({ message: "Email already registered" });
     }
 
-    // Hash password and generate OTP
+    // Hash password using bcrypt
+    console.log("🔐 Hashing password...");
     const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("✅ Password hashed successfully");
+    
+    // Generate OTP
     const otp = generateOTP();
     console.log(`📧 OTP for ${normalizedEmail}: ${otp}`); // For debugging - remove in production
 
@@ -101,7 +111,9 @@ exports.signup = async (req, res) => {
         password: hashedPassword,
         otp,
         otpExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
+        isVerified: false,
       });
+      console.log("✅ Creating new user:", normalizedEmail);
     } else {
       // Update existing unverified user
       user.name = name;
@@ -109,13 +121,17 @@ exports.signup = async (req, res) => {
       user.password = hashedPassword;
       user.otp = otp;
       user.otpExpires = Date.now() + 10 * 60 * 1000;
+      user.isVerified = false;
+      console.log("✅ Updating existing unverified user:", normalizedEmail);
     }
 
     await user.save();
+    console.log("✅ User saved to database:", normalizedEmail);
 
     // Send OTP email with proper error handling
     try {
       await sendOtpEmail(normalizedEmail, otp, "Verify your email - RestoM");
+      console.log("✅ OTP sent successfully to:", normalizedEmail);
       return res.status(201).json({ message: "OTP sent to your email" });
     } catch (emailError) {
       console.error("❌ Signup OTP email send failed:", emailError.message);
@@ -181,19 +197,39 @@ exports.login = async (req, res) => {
     }
 
     const normalizedEmail = (email || "").trim().toLowerCase();
+    console.log("🔐 Login attempt for:", normalizedEmail);
+    
     const user = await User.findOne({ email: normalizedEmail });
     
+    // Check if user exists
     if (!user) {
+      console.log("❌ Login failed: User not found -", normalizedEmail);
       return res.status(401).json({ message: "Invalid email or password" });
     }
     
+    console.log("✅ User found:", normalizedEmail, "| isVerified:", user.isVerified);
+    
+    // Check if email is verified
     if (!user.isVerified) {
-      return res.status(403).json({ message: "Please verify your email first" });
+      console.log("❌ Login failed: Email not verified -", normalizedEmail);
+      return res.status(403).json({ 
+        message: "Email not verified. Please verify your email first.",
+        needsVerification: true 
+      });
     }
 
+    // Compare password using bcrypt
     const isMatch = await bcrypt.compare(password, user.password);
+    
     if (!isMatch) {
+      console.log("❌ Login failed: Password mismatch for -", normalizedEmail);
       return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Validate JWT_SECRET exists
+    if (!process.env.JWT_SECRET) {
+      console.error("❌ JWT_SECRET is not configured!");
+      return res.status(500).json({ message: "Server configuration error" });
     }
 
     // Generate JWT token
@@ -201,7 +237,7 @@ exports.login = async (req, res) => {
       expiresIn: "7d",
     });
 
-    console.log("✅ User logged in:", normalizedEmail);
+    console.log("✅ Login successful:", normalizedEmail);
     return res.status(200).json({
       message: "Login successful",
       token,

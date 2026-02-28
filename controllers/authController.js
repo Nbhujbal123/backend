@@ -1,61 +1,49 @@
 // Backend/controllers/authController.js
 const User = require("../model/userModel");
 const bcrypt = require("bcryptjs");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 const jwt = require("jsonwebtoken");
 
-// 🔹 Setup email transporter with Gmail SMTP
-const EMAIL_USER = process.env.EMAIL_USER?.trim();
-const EMAIL_PASS = process.env.EMAIL_PASS?.replace(/\s+/g, "");
+// 🔹 Initialize Resend with API key
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Create transporter with Gmail service
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS,
-  },
-});
-
-// 🔹 Verify transporter on startup (optional - for debugging)
-if (EMAIL_USER && EMAIL_PASS) {
-  transporter.verify((error, success) => {
-    if (error) {
-      console.log("⚠️ Email transporter verification failed:", error.message);
-    } else {
-      console.log("✅ Email transporter is ready to send emails");
-    }
-  });
+// 🔹 Verify Resend API connection on startup
+if (process.env.RESEND_API_KEY) {
+  resend.apiKeys.list()
+    .then(() => {
+      console.log("✅ Resend API is ready to send emails");
+    })
+    .catch((error) => {
+      console.log("⚠️ Resend API verification failed:", error.message);
+    });
 }
 
 // 🔹 Generate random 6-digit OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// 🔹 Send OTP email helper with proper error handling
+// 🔹 Send OTP email helper with proper error handling using Resend
 const sendOtpEmail = async (email, otp, subject) => {
-  if (!EMAIL_USER || !EMAIL_PASS) {
-    console.error("❌ Email service not configured: EMAIL_USER or EMAIL_PASS is missing");
-    throw new Error("Email service is not configured. Check EMAIL_USER/EMAIL_PASS in environment variables.");
+  if (!process.env.RESEND_API_KEY) {
+    console.error("❌ Email service not configured: RESEND_API_KEY is missing");
+    throw new Error("Email service is not configured. Check RESEND_API_KEY in environment variables.");
   }
 
-  const mailOptions = {
-    from: `"RestoM App" <${EMAIL_USER}>`,
-    to: email,
-    subject: subject,
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto;">
-        <h2 style="color: #FF6A00;">RestoM App</h2>
-        <p>Your OTP is: <strong style="font-size: 24px; color: #333;">${otp}</strong></p>
-        <p style="color: #666;">This OTP will expire in 10 minutes.</p>
-        <p style="color: #999; font-size: 12px;">If you didn't request this, please ignore this email.</p>
-      </div>
-    `,
-  };
-
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("✅ OTP email sent successfully:", info.messageId);
-    return { sent: true, messageId: info.messageId };
+    const data = await resend.emails.send({
+      from: "onboarding@resend.dev",
+      to: email,
+      subject: subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 500px; margin: 0 auto;">
+          <h2 style="color: #FF6A00;">RestoM App</h2>
+          <p>Your OTP is: <strong style="font-size: 24px; color: #333;">${otp}</strong></p>
+          <p style="color: #666;">This OTP will expire in 10 minutes.</p>
+          <p style="color: #999; font-size: 12px;">If you didn't request this, please ignore this email.</p>
+        </div>
+      `,
+    });
+    console.log("✅ OTP email sent successfully:", data.id);
+    return { sent: true, messageId: data.id };
   } catch (error) {
     console.error("❌ Failed to send OTP email:", error.message);
     throw error;

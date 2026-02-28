@@ -12,10 +12,10 @@ const PORT = process.env.PORT || 5000;
 
 /* ===================== ROUTE IMPORTS ===================== */
 // ⚠️ Make sure these paths are correct according to your folder structure
-const authRoutes = require("./routes/authRoutes");
-const menuRoutes = require("./routes/menuRoutes");
-const orderRoutes = require("./routes/orderRoutes");
-const billRoutes = require("./routes/billRoutes");
+const authRoutes = require("./Routes/authRoutes");
+const menuRoutes = require("./Routes/menuRoutes");
+const orderRoutes = require("./Routes/orderRoutes");
+const billRoutes = require("./Routes/billRoutes");
 /* ========================================================= */
 
 

@@ -128,21 +128,20 @@ exports.signup = async (req, res) => {
     await user.save();
     console.log("✅ User saved to database:", normalizedEmail);
 
-    // Send OTP email with proper error handling
+    // Send OTP email - if it fails, still return success
     try {
       await sendOtpEmail(normalizedEmail, otp, "Verify your email - RestoM");
       console.log("✅ OTP sent successfully to:", normalizedEmail);
       return res.status(201).json({ message: "OTP sent to your email" });
     } catch (emailError) {
+      // Log the email error but don't break the flow
       console.error("❌ Signup OTP email send failed:", emailError.message);
-      // Return clear error message - don't crash
-      return res.status(502).json({
-        message: "Signup successful, but failed to send OTP email. Please check email configuration or try again.",
-      });
+      // Return success response but include warning message
+      return res.status(201).json({ message: "Signup successful but OTP email failed" });
     }
   } catch (error) {
     console.error("❌ Signup error:", error.message);
-    return res.status(500).json({ message: "Server error during signup" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -182,7 +181,7 @@ exports.verifyOtp = async (req, res) => {
     return res.status(200).json({ message: "Email verified successfully" });
   } catch (error) {
     console.error("❌ OTP verification error:", error.message);
-    return res.status(500).json({ message: "Server error during OTP verification" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -201,21 +200,18 @@ exports.login = async (req, res) => {
     
     const user = await User.findOne({ email: normalizedEmail });
     
-    // Check if user exists
+    // Check if user exists - return 404
     if (!user) {
       console.log("❌ Login failed: User not found -", normalizedEmail);
-      return res.status(401).json({ message: "Invalid email or password" });
+      return res.status(404).json({ message: "User not found" });
     }
     
     console.log("✅ User found:", normalizedEmail, "| isVerified:", user.isVerified);
     
-    // Check if email is verified
+    // Check if email is verified - return 401 instead of 403
     if (!user.isVerified) {
       console.log("❌ Login failed: Email not verified -", normalizedEmail);
-      return res.status(403).json({ 
-        message: "Email not verified. Please verify your email first.",
-        needsVerification: true 
-      });
+      return res.status(401).json({ message: "Email not verified" });
     }
 
     // Compare password using bcrypt
@@ -232,7 +228,7 @@ exports.login = async (req, res) => {
       return res.status(500).json({ message: "Server configuration error" });
     }
 
-    // Generate JWT token
+    // Generate JWT token using process.env.JWT_SECRET
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
@@ -250,7 +246,7 @@ exports.login = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Login error:", error.message);
-    return res.status(500).json({ message: "Server error during login" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -291,7 +287,7 @@ exports.forgotPassword = async (req, res) => {
     }
   } catch (error) {
     console.error("❌ Forgot password error:", error.message);
-    return res.status(500).json({ message: "Server error during forgot password" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -323,7 +319,7 @@ exports.verifyResetOtp = async (req, res) => {
     return res.status(200).json({ message: "OTP verified" });
   } catch (error) {
     console.error("❌ Reset OTP verification error:", error.message);
-    return res.status(500).json({ message: "Server error during OTP verification" });
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
@@ -357,6 +353,6 @@ exports.resetPassword = async (req, res) => {
     return res.status(200).json({ message: "Password reset successfully" });
   } catch (error) {
     console.error("❌ Password reset error:", error.message);
-    return res.status(500).json({ message: "Server error during password reset" });
+    return res.status(500).json({ message: "Server error" });
   }
 };

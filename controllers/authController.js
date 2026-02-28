@@ -51,6 +51,7 @@ const sendOtpEmail = async (email, otp, subject) => {
 };
 
 // ========== SIGNUP ==========
+
 exports.signup = async (req, res) => {
   try {
     const { name, email, phone, mobile, password } = req.body;
@@ -59,74 +60,91 @@ exports.signup = async (req, res) => {
 
     console.log("📝 Signup attempt for:", normalizedEmail);
 
-    // Validation - 400 for validation errors
+    // Validation
     if (!name || !normalizedEmail || !normalizedMobile || !password) {
-      console.log("❌ Signup failed: Missing required fields");
       return res.status(400).json({ message: "All fields are required" });
     }
+
     if (password.length < 6) {
-      console.log("❌ Signup failed: Password too short");
       return res.status(400).json({ message: "Password must be at least 6 characters" });
     }
+
     const emailRegex = /\S+@\S+\.\S+/;
     if (!emailRegex.test(normalizedEmail)) {
-      console.log("❌ Signup failed: Invalid email format");
       return res.status(400).json({ message: "Invalid email format" });
     }
 
-    // Check if email already exists - 409 for conflict
     let user = await User.findOne({ email: normalizedEmail });
+
     if (user && user.isVerified) {
-      console.log("❌ Signup failed: Email already registered -", normalizedEmail);
       return res.status(409).json({ message: "Email already registered" });
     }
 
-    // Hash password using bcrypt
-    console.log("🔐 Hashing password...");
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log("✅ Password hashed successfully");
-    
+
     // Generate OTP
     const otp = generateOTP();
-    console.log(`📧 OTP for ${normalizedEmail}: ${otp}`); // For debugging - remove in production
+    console.log(`📧 OTP for ${normalizedEmail}: ${otp}`);
 
     if (!user) {
-      // Create new user
       user = new User({
         name,
         email: normalizedEmail,
         mobile: normalizedMobile,
         password: hashedPassword,
         otp,
-        otpExpires: Date.now() + 10 * 60 * 1000, // 10 minutes
+        otpExpires: Date.now() + 10 * 60 * 1000,
         isVerified: false,
       });
-      console.log("✅ Creating new user:", normalizedEmail);
     } else {
-      // Update existing unverified user
       user.name = name;
       user.mobile = normalizedMobile;
       user.password = hashedPassword;
       user.otp = otp;
       user.otpExpires = Date.now() + 10 * 60 * 1000;
       user.isVerified = false;
-      console.log("✅ Updating existing unverified user:", normalizedEmail);
     }
 
     await user.save();
     console.log("✅ User saved to database:", normalizedEmail);
 
-    // Send OTP email - if it fails, still return success
+    // 🔥 SEND OTP USING RESEND
     try {
-      await sendOtpEmail(normalizedEmail, otp, "Verify your email - RestoM");
-      console.log("✅ OTP sent successfully to:", normalizedEmail);
-      return res.status(201).json({ message: "OTP sent to your email" });
+      const { data, error } = await resend.emails.send({
+        from: "onboarding@resend.dev", // change after domain verification
+        to: normalizedEmail,
+        subject: "Verify your email - RestoM",
+        html: `
+          <div style="font-family: Arial; padding: 20px;">
+            <h2>Email Verification</h2>
+            <p>Your OTP is:</p>
+            <h1 style="color: #4CAF50;">${otp}</h1>
+            <p>This OTP will expire in 10 minutes.</p>
+          </div>
+        `
+      });
+
+      if (error) {
+        console.error("❌ Resend error:", error);
+        return res.status(201).json({
+          message: "Signup successful but OTP email failed"
+        });
+      }
+
+      console.log("✅ Resend response:", data);
+
+      return res.status(201).json({
+        message: "OTP sent to your email"
+      });
+
     } catch (emailError) {
-      // Log the email error but don't break the flow
       console.error("❌ Signup OTP email send failed:", emailError.message);
-      // Return success response but include warning message
-      return res.status(201).json({ message: "Signup successful but OTP email failed" });
+      return res.status(201).json({
+        message: "Signup successful but OTP email failed"
+      });
     }
+
   } catch (error) {
     console.error("❌ Signup error:", error.message);
     return res.status(500).json({ message: "Server error" });

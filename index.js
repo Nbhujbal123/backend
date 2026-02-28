@@ -5,16 +5,27 @@ const path = require("path");
 
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
+// ✅ CREATE EXPRESS APP (THIS WAS MISSING)
+const app = express();
+
 const PORT = process.env.PORT || 5000;
 
-// 🔹 Validate all required environment variables at startup
+/* ===================== ROUTE IMPORTS ===================== */
+// ⚠️ Make sure these paths are correct according to your folder structure
+const authRoutes = require("./routes/authRoutes");
+const menuRoutes = require("./routes/menuRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const billRoutes = require("./routes/billRoutes");
+/* ========================================================= */
+
+
+/* ================= ENVIRONMENT VALIDATION ================= */
+
 const requiredEnvVars = ['MONGO_URI', 'JWT_SECRET', 'EMAIL_USER', 'EMAIL_PASS'];
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
   console.error("❌ Missing required environment variables:", missingEnvVars.join(", "));
-  console.error("Please configure all required variables in .env file");
-  // Don't exit in development - just warn
   if (process.env.NODE_ENV === 'production') {
     process.exit(1);
   }
@@ -22,7 +33,6 @@ if (missingEnvVars.length > 0) {
   console.log("✅ All required environment variables are configured");
 }
 
-// 🔹 Log environment configuration (without sensitive data)
 console.log("=== Server Configuration ===");
 console.log("Port:", PORT);
 console.log("Node Environment:", process.env.NODE_ENV || "development");
@@ -32,23 +42,20 @@ console.log("EMAIL_USER Loaded:", !!process.env.EMAIL_USER);
 console.log("EMAIL_PASS Loaded:", !!process.env.EMAIL_PASS);
 console.log("===========================");
 
-// Routes
+/* ======================= MIDDLEWARE ======================= */
 
-/* ===================== CORS FIX ===================== */
-
+// ✅ CORS FIX (Important for Netlify → Render connection)
 app.use(cors({
-  origin: true,        // Allow all origins dynamically
+  origin: true,
   credentials: true
 }));
 
-// Handle preflight properly
 app.options("*", cors());
-
-/* ==================================================== */
 
 app.use(express.json());
 
-// Routes
+/* ========================= ROUTES ========================= */
+
 app.use("/api/auth", authRoutes);
 app.use("/api/menu", menuRoutes);
 app.use("/api/orders", orderRoutes);
@@ -59,9 +66,12 @@ app.get("/", (req, res) => {
   res.status(200).send("🚀 Server is running fine!");
 });
 
+/* ======================= START SERVER ===================== */
+
 const startServer = async () => {
-  console.log("Connecting to MongoDB Atlas...");
   try {
+    console.log("Connecting to MongoDB Atlas...");
+
     await mongoose.connect(process.env.MONGO_URI, {
       family: 4,
     });
@@ -69,7 +79,7 @@ const startServer = async () => {
     console.log("✅ MongoDB Atlas Connected");
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server running at http://localhost:${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
     });
 
   } catch (error) {
